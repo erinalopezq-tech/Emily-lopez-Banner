@@ -1,69 +1,538 @@
 <!DOCTYPE html>
-<!--
-	NOTES:
-	1. All tokens are represented by '$' sign in the template.
-	2. You can write your code only wherever mentioned.
-	3. All occurrences of existing tokens will be replaced by their appropriate values.
-	4. Blank lines will be removed automatically.
-	5. Remove unnecessary comments before creating your template.
--->
-<html>
+<html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="authoring-tool" content="Adobe_Animate_CC">
-<title>boton</title>
-<!-- write your code here -->
-<script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
-<script src="boton.js?1795394278335"></script>
-<script>
-var canvas, stage, exportRoot, anim_container, dom_overlay_container, fnStartAnimation;
-function init() {
-	canvas = document.getElementById("canvas");
-	anim_container = document.getElementById("animation_container");
-	dom_overlay_container = document.getElementById("dom_overlay_container");
-	var comp=AdobeAn.getComposition("D73AF018D39422419D9191E9FD91152B");
-	var lib=comp.getLibrary();
-	var loader = new createjs.LoadQueue(false);
-	loader.addEventListener("fileload", function(evt){handleFileLoad(evt,comp)});
-	loader.addEventListener("complete", function(evt){handleComplete(evt,comp)});
-	var lib=comp.getLibrary();
-	loader.loadManifest(lib.properties.manifest);
-}
-function handleFileLoad(evt, comp) {
-	var images=comp.getImages();	
-	if (evt && (evt.item.type == "image")) { images[evt.item.id] = evt.result; }	
-}
-function handleComplete(evt,comp) {
-	//This function is always called, irrespective of the content. You can use the variable "stage" after it is created in token create_stage.
-	var lib=comp.getLibrary();
-	var ss=comp.getSpriteSheet();
-	var queue = evt.target;
-	var ssMetadata = lib.ssMetadata;
-	for(i=0; i<ssMetadata.length; i++) {
-		ss[ssMetadata[i].name] = new createjs.SpriteSheet( {"images": [queue.getResult(ssMetadata[i].name)], "frames": ssMetadata[i].frames} )
-	}
-	exportRoot = new lib.boton();
-	stage = new lib.Stage(canvas);
-	stage.enableMouseOver();	
-	//Registers the "tick" event listener.
-	fnStartAnimation = function() {
-		stage.addChild(exportRoot);
-		createjs.Ticker.framerate = lib.properties.fps;
-		createjs.Ticker.addEventListener("tick", stage);
-	}	    
-	//Code to support hidpi screens and responsive scaling.
-	AdobeAn.makeResponsive(false,'both',false,1,[canvas,anim_container,dom_overlay_container]);	
-	AdobeAn.compositionLoaded(lib.properties.id);
-	fnStartAnimation();
-}
-</script>
-<!-- write your code here -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Universidad Central del Ecuador — Emily López</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at top, #132c4c 0%, #071324 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Segoe UI", Arial, sans-serif;
+      overflow: hidden;
+    }
+    #animation_container {
+      width: min(96vw, 860px);
+      aspect-ratio: 16 / 9;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(148, 163, 184, 0.18);
+      background: #0b1f3a;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
-<body onload="init();" style="margin:0px;">
-	<div id="animation_container" style="background-color:rgba(255, 255, 255, 1.00); width:800px; height:600px">
-		<canvas id="canvas" width="800" height="600" style="position: absolute; display: block; background-color:rgba(255, 255, 255, 1.00);"></canvas>
-		<div id="dom_overlay_container" style="pointer-events:none; overflow:hidden; width:800px; height:600px; position: absolute; left: 0px; top: 0px; display: block;">
-		</div>
-	</div>
+<body>
+  <div id="animation_container">
+    <canvas id="canvas" width="800" height="450" aria-label="Animación interactiva de presentación - Emily López, Universidad Central del Ecuador"></canvas>
+  </div>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Soporte HiDPI (pantallas Retina / escala Windows)
+      const W = 800;
+      const H = 450;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.scale(dpr, dpr);
+
+      // Línea de tiempo: 24 fps, 168 fotogramas (7 segundos en bucle)
+      const FPS = 24;
+      const TOTAL_FRAMES = 168;
+      let currentFrame = 0; // valor continuo para fluidez y pausa exacta
+      let isPlaying = true;
+      let lastTime = performance.now();
+
+      // Estado de los botones dentro del Canvas
+      const buttons = {
+        play: { x: 572, y: 396, w: 96, h: 36, r: 10, hover: false, pressed: false },
+        stop: { x: 682, y: 396, w: 96, h: 36, r: 10, hover: false, pressed: false }
+      };
+
+      // Estrellas fijas suaves en el cielo
+      const stars = [
+        { x: 55, y: 32, r: 1.4, a: 0.7 },
+        { x: 142, y: 24, r: 1.1, a: 0.5 },
+        { x: 230, y: 38, r: 1.6, a: 0.6 },
+        { x: 340, y: 22, r: 1.2, a: 0.55 },
+        { x: 475, y: 28, r: 1.5, a: 0.65 },
+        { x: 590, y: 20, r: 1.2, a: 0.5 },
+        { x: 680, y: 35, r: 1.7, a: 0.7 },
+        { x: 755, y: 26, r: 1.3, a: 0.6 },
+        { x: 30, y: 118, r: 1.1, a: 0.45 },
+        { x: 774, y: 132, r: 1.3, a: 0.45 },
+        { x: 115, y: 245, r: 1.0, a: 0.35 },
+        { x: 650, y: 242, r: 1.2, a: 0.4 }
+      ];
+
+      function roundRectPath(x, y, w, h, r) {
+        const rad = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + rad, y);
+        ctx.lineTo(x + w - rad, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+        ctx.lineTo(x + w, y + h - rad);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+        ctx.lineTo(x + rad, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+        ctx.lineTo(x, y + rad);
+        ctx.quadraticCurveTo(x, y, x + rad, y);
+        ctx.closePath();
+      }
+
+      function drawCloud(x, y, scale, alpha) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "rgba(255, 255, 255, " + alpha + ")";
+        roundRectPath(0, 16, 98, 22, 11);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(32, 17, 19, 0, Math.PI * 2);
+        ctx.arc(58, 13, 23, 0, Math.PI * 2);
+        ctx.arc(78, 19, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawMountainChain(offsetX, yBase, peaks, color) {
+        // Dos copias seguidas de ancho W para scroll infinito sin cortes
+        for (let copy = 0; copy < 2; copy++) {
+          const base = offsetX + copy * W;
+          ctx.beginPath();
+          ctx.moveTo(base, yBase);
+          for (let i = 0; i < peaks.length; i++) {
+            ctx.lineTo(base + peaks[i][0], peaks[i][1]);
+          }
+          ctx.lineTo(base + W, yBase);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      function drawCar(x, y, wheelAngle) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Sombra bajo el auto
+        ctx.fillStyle = "rgba(2, 6, 23, 0.55)";
+        ctx.beginPath();
+        ctx.ellipse(66, 54, 62, 6.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Haz de luz delantero
+        const beam = ctx.createLinearGradient(126, 30, 210, 30);
+        beam.addColorStop(0, "rgba(254, 240, 138, 0.36)");
+        beam.addColorStop(1, "rgba(254, 240, 138, 0)");
+        ctx.fillStyle = beam;
+        ctx.beginPath();
+        ctx.moveTo(126, 26);
+        ctx.lineTo(208, 13);
+        ctx.lineTo(208, 47);
+        ctx.lineTo(126, 35);
+        ctx.closePath();
+        ctx.fill();
+
+        // Carrocería inferior
+        const bodyGrad = ctx.createLinearGradient(0, 18, 0, 46);
+        bodyGrad.addColorStop(0, "#22d3ee");
+        bodyGrad.addColorStop(1, "#0891b2");
+        ctx.fillStyle = bodyGrad;
+        roundRectPath(4, 21, 124, 24, 9);
+        ctx.fill();
+
+        // Franja lateral inferior
+        ctx.fillStyle = "#0e7490";
+        roundRectPath(8, 36, 116, 7, 3.5);
+        ctx.fill();
+
+        // Cabina / techo
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.moveTo(25, 22);
+        ctx.quadraticCurveTo(36, 5, 48, 4);
+        ctx.lineTo(84, 4);
+        ctx.quadraticCurveTo(96, 5, 106, 22);
+        ctx.closePath();
+        ctx.fill();
+
+        // Ventana trasera
+        ctx.fillStyle = "#e0f2fe";
+        ctx.beginPath();
+        ctx.moveTo(33, 20);
+        ctx.lineTo(46, 8);
+        ctx.lineTo(63, 8);
+        ctx.lineTo(63, 20);
+        ctx.closePath();
+        ctx.fill();
+
+        // Parabrisas delantero
+        ctx.fillStyle = "#bae6fd";
+        ctx.beginPath();
+        ctx.moveTo(68, 20);
+        ctx.lineTo(68, 8);
+        ctx.lineTo(83, 8);
+        ctx.lineTo(97, 20);
+        ctx.closePath();
+        ctx.fill();
+
+        // Faro delantero
+        ctx.fillStyle = "#fef08a";
+        roundRectPath(120, 25, 8, 8, 3);
+        ctx.fill();
+
+        // Luz trasera
+        ctx.fillStyle = "#fb7185";
+        roundRectPath(3, 25, 6, 8, 2);
+        ctx.fill();
+
+        // Ruedas giratorias
+        drawWheel(32, 46, wheelAngle);
+        drawWheel(100, 46, wheelAngle);
+
+        ctx.restore();
+      }
+
+      function drawWheel(cx, cy, angle) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+
+        // Neumático
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(0, 0, 13, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rin metálico
+        ctx.fillStyle = "#cbd5e1";
+        ctx.beginPath();
+        ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Radios para que se note el giro
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 1.6;
+        for (let i = 0; i < 4; i++) {
+          const a = (i * Math.PI) / 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * 6.5, Math.sin(a) * 6.5);
+          ctx.stroke();
+        }
+
+        // Centro
+        ctx.fillStyle = "#334155";
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawButton(btn, label, type) {
+        ctx.save();
+        const isPlay = type === "play";
+        let bg = isPlay ? "#10b981" : "#ef4444";
+        let border = isPlay ? "#059669" : "#b91c1c";
+
+        if (btn.pressed) {
+          bg = isPlay ? "#047857" : "#b91c1c";
+        } else if (btn.hover) {
+          bg = isPlay ? "#34d399" : "#f87171";
+        }
+
+        // Sombra suave del botón
+        ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+
+        roundRectPath(btn.x, btn.y, btn.w, btn.h, btn.r);
+        ctx.fillStyle = bg;
+        ctx.fill();
+
+        ctx.shadowColor = "transparent";
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = border;
+        ctx.stroke();
+
+        // Ícono blanco
+        ctx.fillStyle = "#ffffff";
+        if (isPlay) {
+          ctx.beginPath();
+          ctx.moveTo(btn.x + 17, btn.y + 10);
+          ctx.lineTo(btn.x + 30, btn.y + 18);
+          ctx.lineTo(btn.x + 17, btn.y + 26);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          roundRectPath(btn.x + 15, btn.y + 11, 14, 14, 2.5);
+          ctx.fill();
+        }
+
+        // Texto del botón
+        ctx.font = "700 14px 'Segoe UI', Arial, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, btn.x + 38, btn.y + btn.h / 2 + 0.5);
+
+        ctx.restore();
+      }
+
+      function render(frame) {
+        const t = frame / TOTAL_FRAMES; // 0..1
+
+        // 1. FONDO: Cielo degradado institucional
+        const sky = ctx.createLinearGradient(0, 0, 0, 340);
+        sky.addColorStop(0, "#091a32");
+        sky.addColorStop(0.55, "#112d52");
+        sky.addColorStop(1, "#1c4678");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, 340);
+
+        // Franja superior UCE (rojo y dorado)
+        ctx.fillStyle = "#d90429";
+        ctx.fillRect(0, 0, W, 6);
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(0, 6, W, 3);
+
+        // Estrellas suaves
+        for (const s of stars) {
+          const twinkle = s.a * (0.7 + 0.3 * Math.sin(frame * 0.12 + s.x));
+          ctx.fillStyle = "rgba(255, 255, 255, " + twinkle.toFixed(3) + ")";
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 2. NUBES (Parallax muy lento: derecha -> izquierda)
+        const cloudShift = (frame * 1.1) % (W + 160);
+        drawCloud(((220 - cloudShift + W + 160) % (W + 160)) - 110, 26, 1.0, 0.11);
+        drawCloud(((540 - cloudShift + W + 160) % (W + 160)) - 110, 52, 1.15, 0.09);
+        drawCloud(((810 - cloudShift + W + 160) % (W + 160)) - 110, 22, 0.88, 0.1);
+
+        // 3. MONTAÑAS (Parallax medio: derecha -> izquierda en bucle infinito)
+        const mBackX = -((frame * 1.4) % W);
+        drawMountainChain(
+          mBackX,
+          340,
+          [
+            [0, 294], [105, 254], [215, 290], [345, 246],
+            [480, 286], [625, 250], [740, 282], [800, 294]
+          ],
+          "#193b66"
+        );
+
+        const mFrontX = -((frame * 2.6) % W);
+        drawMountainChain(
+          mFrontX,
+          340,
+          [
+            [0, 312], [140, 276], [280, 308], [420, 270],
+            [565, 304], [695, 274], [800, 312]
+          ],
+          "#224d80"
+        );
+
+        // 4. CARRETERA (Parallax rápido: derecha -> izquierda)
+        ctx.fillStyle = "#64748b";
+        ctx.fillRect(0, 340, W, 6);
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(0, 346, W, H - 346);
+
+        // Rayas discontinuas amarillas moviéndose rápido
+        const dashSpacing = 110;
+        const dashOffset = (frame * 8) % dashSpacing;
+        ctx.fillStyle = "#fbbf24";
+        for (let sx = -dashSpacing; sx < W + dashSpacing; sx += dashSpacing) {
+          roundRectPath(sx - dashOffset, 383, 58, 5, 2.5);
+          ctx.fill();
+        }
+
+        // 5. TARJETA CONTENEDORA DEL TEXTO (sutil, traslúcida)
+        ctx.save();
+        roundRectPath(46, 44, 708, 186, 16);
+        ctx.fillStyle = "rgba(8, 22, 42, 0.62)";
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.38)";
+        ctx.stroke();
+        ctx.restore();
+
+        // 6. MÁSCARA ANIMADA SOBRE LOS TEXTOS (barrido de izquierda a derecha: fotogramas 0..60)
+        const maskDuration = 60;
+        const maskProgress = Math.min(1, frame / maskDuration);
+        // Suavizado ease-out cúbico
+        const eased = 1 - Math.pow(1 - maskProgress, 3);
+        const maskX = 48;
+        const maskW = 704 * eased;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(maskX, 46, maskW, 182);
+        ctx.clip();
+
+        // Universidad Central del Ecuador
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "700 28px 'Segoe UI', Arial, sans-serif";
+        ctx.fillText("UNIVERSIDAD CENTRAL DEL ECUADOR", W / 2, 62);
+
+        // Línea divisoria dorada
+        ctx.fillStyle = "#fbbf24";
+        roundRectPath(235, 103, 330, 3.5, 2);
+        ctx.fill();
+
+        // Facultad de Filosofía, Letras y Ciencias de la Educación
+        ctx.fillStyle = "#bae6fd";
+        ctx.font = "400 19px 'Segoe UI', Arial, sans-serif";
+        ctx.fillText("Facultad de Filosofía, Letras y Ciencias de la Educación", W / 2, 118);
+
+        // Nombre: Emily López
+        ctx.fillStyle = "#fde047";
+        ctx.font = "italic 700 40px Georgia, 'Times New Roman', serif";
+        ctx.fillText("Emily López", W / 2, 156);
+
+        ctx.restore();
+
+        // Barra luminosa sutil que acompaña el borde de la máscara mientras se revela
+        if (maskProgress > 0.01 && maskProgress < 0.995) {
+          const edgeX = maskX + maskW;
+          const fadeOut = maskProgress > 0.85 ? (1 - maskProgress) / 0.15 : 1;
+          const glow = ctx.createLinearGradient(edgeX - 10, 0, edgeX + 6, 0);
+          glow.addColorStop(0, "rgba(253, 224, 71, 0)");
+          glow.addColorStop(0.65, "rgba(253, 224, 71, " + (0.65 * fadeOut).toFixed(3) + ")");
+          glow.addColorStop(1, "rgba(253, 224, 71, 0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(edgeX - 10, 52, 16, 170);
+        }
+
+        // 7. AUTO ANIMADO (interpolación izquierda -> derecha sobre el carril superior)
+        const carX = -150 + t * (W + 300);
+        const carBounce = Math.sin(frame * 0.6) * 0.9;
+        const wheelAngle = frame * 0.42;
+        drawCar(carX, 316 + carBounce, wheelAngle);
+
+        // 8. INDICADOR DISCRETO DE ESTADO + BOTONES PLAY Y STOP (siempre visibles)
+        ctx.save();
+        ctx.fillStyle = isPlaying ? "#34d399" : "#f87171";
+        ctx.beginPath();
+        ctx.arc(32, 414, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#cbd5e1";
+        ctx.font = "500 13px 'Segoe UI', Arial, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(isPlaying ? "Reproduciendo · HTML5 Canvas" : "Detenido · Pulsa PLAY para continuar", 45, 414.5);
+        ctx.restore();
+
+        drawButton(buttons.play, "PLAY", "play");
+        drawButton(buttons.stop, "STOP", "stop");
+      }
+
+      // Conversión de coordenadas del puntero al sistema 800x450 del canvas
+      function getCanvasPoint(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: ((evt.clientX - rect.left) / rect.width) * W,
+          y: ((evt.clientY - rect.top) / rect.height) * H
+        };
+      }
+
+      function hitTest(btn, pt) {
+        return pt.x >= btn.x && pt.x <= btn.x + btn.w && pt.y >= btn.y && pt.y <= btn.y + btn.h;
+      }
+
+      canvas.addEventListener("mousemove", function (evt) {
+        const pt = getCanvasPoint(evt);
+        buttons.play.hover = hitTest(buttons.play, pt);
+        buttons.stop.hover = hitTest(buttons.stop, pt);
+        canvas.style.cursor = buttons.play.hover || buttons.stop.hover ? "pointer" : "default";
+      });
+
+      canvas.addEventListener("mousedown", function (evt) {
+        const pt = getCanvasPoint(evt);
+        buttons.play.pressed = hitTest(buttons.play, pt);
+        buttons.stop.pressed = hitTest(buttons.stop, pt);
+      });
+
+      window.addEventListener("mouseup", function () {
+        buttons.play.pressed = false;
+        buttons.stop.pressed = false;
+      });
+
+      canvas.addEventListener("click", function (evt) {
+        const pt = getCanvasPoint(evt);
+        if (hitTest(buttons.stop, pt)) {
+          // Detiene exactamente en el fotograma actual
+          isPlaying = false;
+        } else if (hitTest(buttons.play, pt)) {
+          // Continúa desde el fotograma actual sin reiniciar
+          if (!isPlaying) {
+            isPlaying = true;
+            lastTime = performance.now();
+          }
+        }
+      });
+
+      // Soporte táctil para celulares/tablets
+      canvas.addEventListener("touchstart", function (evt) {
+        if (!evt.touches.length) return;
+        const pt = getCanvasPoint(evt.touches[0]);
+        if (hitTest(buttons.stop, pt)) {
+          evt.preventDefault();
+          isPlaying = false;
+        } else if (hitTest(buttons.play, pt)) {
+          evt.preventDefault();
+          if (!isPlaying) {
+            isPlaying = true;
+            lastTime = performance.now();
+          }
+        }
+      }, { passive: false });
+
+      // API pública sencilla para depuración/inspección
+      window.animControl = {
+        play: function () { isPlaying = true; lastTime = performance.now(); },
+        stop: function () { isPlaying = false; },
+        getState: function () { return { isPlaying: isPlaying, currentFrame: currentFrame }; }
+      };
+
+      function tick(now) {
+        const dt = Math.min((now - lastTime) / 1000, 0.1);
+        lastTime = now;
+        if (isPlaying) {
+          currentFrame = (currentFrame + dt * FPS) % TOTAL_FRAMES;
+        }
+        render(currentFrame);
+        requestAnimationFrame(tick);
+      }
+
+      render(0);
+      requestAnimationFrame(tick);
+    })();
+  </script>
 </body>
 </html>
